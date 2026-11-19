@@ -152,7 +152,7 @@ export function StepsMode({ initialStep, onHome, onMode }: Props) {
               </div>
             )}
 
-            {step.checks && <DrawLab key={`s${n}`} title={`ステップ${step.n} ${step.title}`} fixedSource="v" ghostX={ghost} onPlayed={onPlayed} />}
+            {step.checks && <DrawLab key={`s${n}`} title={`ステップ${step.n} ${step.title}`} fixedSource="v" endNode ghostX={ghost} onPlayed={onPlayed} />}
             {task && problem && (
               <PredictTask
                 key={`s${n}t${taskIdx}`}

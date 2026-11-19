@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RANGES, type Kind } from '../core/constants'
+import { RANGES, T_MAX, type Kind } from '../core/constants'
 import { completeFree, emptyFree, flat, freeCoverage, polyCoverage, polyCurve, smoothFree, stroke, type Curve, type Free, type Node } from '../core/curve'
 import type { Edit } from './GraphView'
 
@@ -61,28 +61,30 @@ export type Tool = 'poly' | 'free'
  * 1枚のグラフに描く線（折れ線またはフリーハンド）。
  * curve は、未記入を補った曲線。drawn は「何か描いたか」。
  */
-export function useSketch(opts: { tool: Tool; firstY?: number; lockFirst?: boolean }) {
+export function useSketch(opts: { tool: Tool; firstY?: number; lockFirst?: boolean; endNode?: boolean }) {
   const first = opts.firstY ?? 0
+  // endNode：はじめから t = 10 s にも節点を置いておく（縦にだけ動かせる）
+  const initial = useCallback((): Node[] => (opts.endNode ? [{ t: 0, y: first }, { t: T_MAX, y: first }] : [{ t: 0, y: first }]), [first, opts.endNode])
   const [tool, setTool] = useState<Tool>(opts.tool)
-  const [nodes, setNodes] = useState<Node[]>([{ t: 0, y: first }])
+  const [nodes, setNodes] = useState<Node[]>(initial)
   const [free, setFree] = useState<Free>(emptyFree)
   const range = useRef<[number, number] | null>(null)
   const freeRef = useRef(free)
   freeRef.current = free
 
   const reset = useCallback(() => {
-    setNodes([{ t: 0, y: first }])
+    setNodes(initial())
     setFree(emptyFree())
-  }, [first])
+  }, [initial])
 
   const done = useMemo(() => (tool === 'free' ? completeFree(free) : null), [tool, free])
   const curve: Curve = useMemo(() => (tool === 'poly' ? polyCurve(nodes) : (done?.curve ?? flat(first))), [tool, nodes, done, first])
-  const drawn = tool === 'poly' ? nodes.length > 1 || nodes[0].y !== first : done !== null
+  const drawn = tool === 'poly' ? nodes.length > (opts.endNode ? 2 : 1) || nodes.some((n) => n.y !== first) : done !== null
   const coverage = (dur: number) => (tool === 'poly' ? polyCoverage(nodes, dur) : freeCoverage(free, dur))
 
   const edit: Edit =
     tool === 'poly'
-      ? { tool: 'poly', nodes, onNodes: setNodes, lockFirst: opts.lockFirst }
+      ? { tool: 'poly', nodes, onNodes: setNodes, lockFirst: opts.lockFirst, lockLast: opts.endNode }
       : {
           tool: 'free',
           onStroke: (t0, y0, t1, y1) => {

@@ -20,7 +20,7 @@ export type Layer = {
 }
 
 export type Edit =
-  | { tool: 'poly'; nodes: Node[]; onNodes: (n: Node[]) => void; lockFirst?: boolean }
+  | { tool: 'poly'; nodes: Node[]; onNodes: (n: Node[]) => void; lockFirst?: boolean; /** 最後の節点を t = 10 s に固定する（縦にだけ動き、消せない） */ lockLast?: boolean }
   | { tool: 'free'; onStroke: (t0: number, y0: number, t1: number, y1: number) => void; onEnd: () => void }
 
 export type GraphProps = {
@@ -382,13 +382,15 @@ export function GraphView(p: GraphProps) {
   const stepY = SNAP[p.kind]
 
   /** 節点 k を (t, y) へ動かす（となりを追い越さない・同じ時刻は2つまで） */
-  const moveNode = (nodes: Node[], k: number, t: number, y: number, lockFirst: boolean): Node[] => {
+  const moveNode = (nodes: Node[], k: number, t: number, y: number, lockFirst: boolean, lockLast = false): Node[] => {
     const out = nodes.map((n) => ({ ...n }))
     let nt = snap(t, SNAP_T)
     let ny = clamp(snap(y, stepY), -p.lim, p.lim)
     if (k === 0) {
       nt = 0
       if (lockFirst) ny = nodes[0].y
+    } else if (lockLast && k === nodes.length - 1) {
+      nt = T_MAX
     } else {
       const prev = out[k - 1]
       const next = out[k + 1]
@@ -397,6 +399,7 @@ export function GraphView(p: GraphProps) {
       if (k >= 2 && out[k - 2].t === prev.t) lo = prev.t + SNAP_T
       let hi = next ? next.t : T_MAX
       if (next && out[k + 2] && out[k + 2].t === next.t) hi = next.t - SNAP_T
+      if (lockLast) hi = Math.min(hi, T_MAX - SNAP_T)
       if (lo > hi) return nodes
       nt = clamp(nt, lo, hi)
     }
@@ -435,8 +438,9 @@ export function GraphView(p: GraphProps) {
     })
     let nodes = ed.nodes
     let created = false
+    const isLocked = (i: number, list: Node[]) => !!(ed.lockLast && i === list.length - 1)
     if (k < 0) {
-      const t = snap(pos.t, SNAP_T)
+      const t = ed.lockLast ? Math.min(snap(pos.t, SNAP_T), T_MAX - SNAP_T) : snap(pos.t, SNAP_T)
       const same = nodes.map((n, i) => (n.t === t ? i : -1)).filter((i) => i >= 0)
       if (t === 0) k = 0
       else if (same.length >= 2 || nodes.length >= MAX_NODES) {
@@ -453,11 +457,11 @@ export function GraphView(p: GraphProps) {
         created = true
       }
     }
-    if (!created) nodes = moveNode(nodes, k, k === 0 ? 0 : nodes[k].t, pos.y, !!ed.lockFirst)
+    if (!created) nodes = moveNode(nodes, k, k === 0 ? 0 : nodes[k].t, pos.y, !!ed.lockFirst, !!ed.lockLast)
     ed.onNodes(nodes)
     setReadout(nodes[k])
     const timer =
-      !created && k > 0
+      !created && k > 0 && !isLocked(k, nodes)
         ? window.setTimeout(() => {
             const d = drag.current
             const cur = latest.current.edit
@@ -495,7 +499,7 @@ export function GraphView(p: GraphProps) {
     if (d.mode === 'node' && ed?.tool === 'poly') {
       const { cx, cy } = local(e)
       const pos = fromPx(cx, cy)
-      const next = moveNode(ed.nodes, d.k, pos.t, pos.y, !!ed.lockFirst)
+      const next = moveNode(ed.nodes, d.k, pos.t, pos.y, !!ed.lockFirst, !!ed.lockLast)
       if (next[d.k].t !== ed.nodes[d.k].t || next[d.k].y !== ed.nodes[d.k].y) {
         d.moved = true
         window.clearTimeout(d.timer)
@@ -522,7 +526,7 @@ export function GraphView(p: GraphProps) {
     const r = canvas.current!.getBoundingClientRect()
     const cx = e.clientX - r.left
     const cy = e.clientY - r.top
-    const k = ed.nodes.findIndex((n, i) => i > 0 && Math.hypot(px(n.t) - cx, py(n.y) - cy) < 16)
+    const k = ed.nodes.findIndex((n, i) => i > 0 && !(ed.lockLast && i === ed.nodes.length - 1) && Math.hypot(px(n.t) - cx, py(n.y) - cy) < 16)
     if (k > 0) ed.onNodes(ed.nodes.filter((_, i) => i !== k))
   }
 

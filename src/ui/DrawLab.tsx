@@ -20,14 +20,16 @@ type Props = {
   /** 再生して3秒たったときに知らせる */
   onPlayed?: (r: { x: Curve; v: Curve }) => void
   aids?: { tangent?: boolean; area?: boolean }
+  /** はじめから t = 10 s に節点を置いておく（ステップ学習で使う） */
+  endNode?: boolean
 }
 
 type Verdict = { score: number; band: [number, number] | null }
 
-export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, onPlayed, aids }: Props) {
+export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, onPlayed, aids, endNode = false }: Props) {
   const [source, setSource] = useState<'x' | 'v'>(fixedSource ?? 'v')
-  const sx = useSketch({ tool: 'poly' })
-  const sv = useSketch({ tool: 'poly' })
+  const sx = useSketch({ tool: 'poly', endNode })
+  const sv = useSketch({ tool: 'poly', endNode })
   const sk = source === 'v' ? sv : sx
   const [x0, setX0] = useState(0)
   const rawX0 = useRef(0)
@@ -133,7 +135,7 @@ export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, on
         </div>
         <p className="text-xs leading-relaxed text-slate-600">
           {sk.tool === 'poly'
-            ? `グラフをタップして点を置き、ドラッグで動かします（長押しで消す）。同じ時刻にもう1つ点を置くと、値を一瞬で変えられます。点は 0.5 s・${SNAP[source]} ${source === 'v' ? 'm/s' : 'm'} きざみです。`
+            ? `${endNode ? '両はしの○（0 s と 10 s）を上下にドラッグすると、線全体の形を変えられます。間をタップすると点が増え、' : 'グラフをタップして点を置き、'}ドラッグで動かします（長押しで消す）。同じ時刻にもう1つ点を置くと、値を一瞬で変えられます。点は 0.5 s・${SNAP[source]} ${source === 'v' ? 'm/s' : 'm'} きざみです。`
             : '指でなぞって描きます。左へ戻ってなぞると、そこから描き直せます。'}
           {source === 'v' && ' t = 0 のとき、台車をドラッグすると、はじめの位置を変えられます。'}
           {source === 'x' && sk.tool === 'poly' && ' 折れ線の x-t は、角のところで速度が一瞬で変わる運動になるので、a-t は表示しません。'}
