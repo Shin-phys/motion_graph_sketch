@@ -4,10 +4,11 @@ import { COLOR, SIGMA, SNAP, T_MAX, type Kind } from '../core/constants'
 import { integrate, maxAbs, polySlope, smoothSlope, valueAt, type Curve } from '../core/curve'
 import { buildMotion } from '../core/motion'
 import { passed, score, worstInterval } from '../core/score'
+import { strobeMarks } from '../core/strobe'
 import { PROMPTS, problemById } from '../data/problems'
 import { Stage, Transport, type Panel } from './Stage'
 import { Btn, Card, Segmented, Toggle } from './common'
-import { pickLim, usePlayer, useSketch } from './hooks'
+import { pickLim, usePlayer, useSketch, useStrobe } from './hooks'
 
 type Props = {
   title: string
@@ -38,6 +39,7 @@ export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, on
   const [promptId, setPromptId] = useState('')
   const [verdict, setVerdict] = useState<Verdict | null>(null)
   const [main, setMain] = useState<Kind>(source)
+  const [strobe, setStrobe] = useStrobe()
 
   const target = useMemo(() => {
     const p = problemById(promptId)
@@ -166,6 +168,7 @@ export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, on
           x: valueAt(g.x, t),
           v: valueAt(g.v, t),
           lim: xLim,
+          marks: strobe ? strobeMarks(g.x, t) : null,
           onDrag: canPlace
             ? (dx) => {
                 rawX0.current = Math.min(5, Math.max(-5, rawX0.current + dx))
@@ -176,7 +179,7 @@ export function DrawLab({ title, fixedSource, prompts = false, ghostX = null, on
         panels={panels}
         main={main}
         onMain={setMain}
-        bar={<Transport player={player} dur={dur} onClear={clear} />}
+        bar={<Transport player={player} dur={dur} onClear={clear} strobe={{ on: strobe, set: setStrobe }} />}
       />
     </div>
   )

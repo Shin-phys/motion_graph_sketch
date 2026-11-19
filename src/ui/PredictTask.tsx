@@ -6,10 +6,11 @@ import { buildMotion, curveOf, hasCurve, splitTask, type Problem, type Task } fr
 import { HINTS, detectPattern } from '../core/patterns'
 import { passed, score, worstInterval } from '../core/score'
 import { recordBest } from '../core/storage'
+import { strobeMarks } from '../core/strobe'
 import type { Layer } from './GraphView'
 import { Stage, Transport, type Panel } from './Stage'
 import { Btn, Card, Segmented, Toggle, fmt } from './common'
-import { usePlayer, useSketch } from './hooks'
+import { usePlayer, useSketch, useStrobe } from './hooks'
 
 const KIND: Record<'xt' | 'vt' | 'at', Kind> = { xt: 'x', vt: 'v', at: 'a' }
 const GRAPH: Record<Kind, string> = { x: 'x-t', v: 'v-t', a: 'a-t' }
@@ -46,6 +47,7 @@ export function PredictTask({ problem, task, aids, onResult, onNext, nextLabel =
   const [area, setArea] = useState(!!aids?.area)
   const [reflect, setReflect] = useState<number | null>(null)
   const [main, setMain] = useState<Kind>(kind)
+  const [strobe, setStrobe] = useStrobe()
 
   const t = player.t
   const ready = sk.drawn && sk.coverage(m.dur) >= COVERAGE - 1e-9
@@ -171,11 +173,11 @@ export function PredictTask({ problem, task, aids, onResult, onNext, nextLabel =
       </Card>
       <Stage
         title={`${problem.id} ${problem.title}（${taskLabel(task)}）`}
-        track={{ x: animates ? valueAt(m.x, t) : problem.x0, v: open ? valueAt(m.v, t) : null, lim: 5 }}
+        track={{ x: animates ? valueAt(m.x, t) : problem.x0, v: open ? valueAt(m.v, t) : null, lim: 5, marks: strobe && animates ? strobeMarks(m.x, t) : null }}
         panels={panels}
         main={main}
         onMain={open ? setMain : undefined}
-        bar={phase === 'reveal' ? null : <Transport player={player} dur={m.dur} canPlay={animates} />}
+        bar={phase === 'reveal' ? null : <Transport player={player} dur={m.dur} canPlay={animates} strobe={{ on: strobe, set: setStrobe, disabled: !animates }} />}
       />
     </div>
   )

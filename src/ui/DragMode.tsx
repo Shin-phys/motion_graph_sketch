@@ -6,11 +6,12 @@ import { buildMotion } from '../core/motion'
 import { LiveFilter, finalize, type Sample } from '../core/record'
 import { passed, score, worstInterval } from '../core/score'
 import { loadProgress, recordBest } from '../core/storage'
+import { strobeMarks } from '../core/strobe'
 import { PROBLEMS, problemById } from '../data/problems'
 import type { Layer } from './GraphView'
 import { Stage, Transport, type Panel } from './Stage'
 import { Btn, Card, Header, Segmented, Toggle } from './common'
-import { pickLim, usePlayer } from './hooks'
+import { pickLim, usePlayer, useStrobe } from './hooks'
 
 type Phase = 'idle' | 'count' | 'rec' | 'done'
 type Result = { x: Curve; v: Curve; a: Curve }
@@ -30,6 +31,7 @@ export function DragMode({ onHome }: { onHome: () => void }) {
   const [verdict, setVerdict] = useState<{ score: number; band: [number, number] | null } | null>(null)
   const [best, setBest] = useState(() => loadProgress().match)
   const [main, setMain] = useState<Kind>('x')
+  const [strobe, setStrobe] = useStrobe()
 
   const problem = sub === 'match' ? problemById(pid) : null
   const m = useMemo(() => (problem ? buildMotion(problem) : null), [problem])
@@ -197,11 +199,12 @@ export function DragMode({ onHome }: { onHome: () => void }) {
             lim: 5,
             onDrag: phase === 'done' ? undefined : onDrag,
             badge: phase === 'count' ? String(count) : null,
+            marks: strobe && phase === 'done' && result ? strobeMarks(result.x, t) : strobe && phase === 'rec' ? strobeMarks(liveX, Math.min(t, (L.last * 0.05))) : null,
           }}
           panels={panels}
           main={main}
           onMain={setMain}
-          bar={phase === 'done' ? <Transport player={player} dur={dur} /> : null}
+          bar={phase === 'done' ? <Transport player={player} dur={dur} strobe={{ on: strobe, set: setStrobe }} /> : null}
         />
       </main>
     </div>

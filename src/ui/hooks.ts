@@ -112,6 +112,30 @@ export function useSketch(opts: { tool: Tool; firstY?: number; lockFirst?: boole
 
 export type Sketch = ReturnType<typeof useSketch>
 
+/** 足あとを出すかどうか（生徒がえらんだ状態を、次の問題にも引き継ぐ） */
+const STROBE_KEY = 'motion_graph_sketch.strobe'
+let strobeMemo: boolean | null = null
+export function useStrobe(): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    if (strobeMemo !== null) return strobeMemo
+    try {
+      return localStorage.getItem(STROBE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const set = useCallback((v: boolean) => {
+    strobeMemo = v
+    setOn(v)
+    try {
+      localStorage.setItem(STROBE_KEY, v ? '1' : '0')
+    } catch {
+      // 保存できなくても続行する
+    }
+  }, [])
+  return [on, set]
+}
+
 /** 値が収まる、いちばん小さい表示範囲 */
 export const pickLim = (kind: Kind, need: number) => RANGES[kind].find((r) => need <= r + 1e-9) ?? RANGES[kind][RANGES[kind].length - 1]
 

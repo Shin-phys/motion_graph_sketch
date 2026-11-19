@@ -255,3 +255,26 @@ describe('ドラッグ記録', () => {
     expect(score(r.x, m.x, 'x', m.dur)).toBe(100)
   })
 })
+
+describe('ストロボの足あと', () => {
+  it('p16：加速で間隔が広がり、等速でそろい、折り返すと下の段へ移る', async () => {
+    const { strobeMarks, groupMarks } = await import('./strobe')
+    const m = buildMotion(problemById('p16')!)
+    const marks = strobeMarks(m.x, m.dur)
+    expect(marks.map((k) => Number(k.x.toFixed(6)))).toEqual([-4, -3.5, -2, 0, 2, 3.5, 4, 3.5, 2, 0, -2])
+    // t = 6 s（いちばん右）までは右へ進む段、そのあとは戻る段
+    expect(marks.map((k) => k.lane)).toEqual([0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+    // 途中までしか再生していなければ、そこまでの点だけ
+    expect(strobeMarks(m.x, 2.7).length).toBe(3)
+    expect(groupMarks(marks).length).toBe(11)
+  })
+  it('止まっている間の点は1つにまとめる', async () => {
+    const { strobeMarks, groupMarks } = await import('./strobe')
+    const m = buildMotion(problemById('p03')!)
+    const g = groupMarks(strobeMarks(m.x, m.dur))
+    expect(g[g.length - 1]).toEqual({ t0: 4, t1: 10, x: 3, lane: 0 })
+    // はじめに左へ動き出す運動は、最初の点から戻る段
+    const m4 = buildMotion(problemById('p04')!)
+    expect(strobeMarks(m4.x, 1)[0].lane).toBe(1)
+  })
+})

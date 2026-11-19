@@ -1,15 +1,16 @@
 // コースと3つのグラフ、操作バーを並べる
 import { useRef, type ReactNode } from 'react'
 import type { Kind } from '../core/constants'
+import type { Mark } from '../core/strobe'
 import { GraphView, type GraphProps } from './GraphView'
 import { Track } from './Track'
-import { Btn, Segmented, fmt } from './common'
+import { Btn, Segmented, Toggle, fmt } from './common'
 import { useWide, type Player } from './hooks'
 
 export type Panel = Omit<GraphProps, 'kind' | 'height'>
 
 type Props = {
-  track: { x: number; v?: number | null; lim: number; onDrag?: (dx: number) => void; onGrab?: (h: boolean) => void; badge?: string | null }
+  track: { x: number; v?: number | null; lim: number; onDrag?: (dx: number) => void; onGrab?: (h: boolean) => void; badge?: string | null; marks?: Mark[] | null }
   panels: Record<Kind, Panel>
   /** 大きく表示するグラフ */
   main: Kind
@@ -91,7 +92,22 @@ export function Stage({ track, panels, main, onMain, bar, title }: Props) {
 }
 
 /** 再生・時刻の操作バー */
-export function Transport({ player, dur, canPlay = true, onClear, extra }: { player: Player; dur: number; canPlay?: boolean; onClear?: () => void; extra?: ReactNode }) {
+const STEP = 0.5
+
+type TransportProps = {
+  player: Player
+  dur: number
+  canPlay?: boolean
+  onClear?: () => void
+  extra?: ReactNode
+  /** ストロボの足あと。disabled のときは押せない（答えになってしまう問題） */
+  strobe?: { on: boolean; set: (on: boolean) => void; disabled?: boolean }
+}
+
+export function Transport({ player, dur, canPlay = true, onClear, extra, strobe }: TransportProps) {
+  // コマ送り：0.5 s の区切りへ進める・戻す
+  const fwd = () => player.scrub(Math.min(dur, Math.floor(player.t / STEP + 1e-6) * STEP + STEP))
+  const back = () => player.scrub(Math.max(0, Math.ceil(player.t / STEP - 1e-6) * STEP - STEP))
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
       {canPlay && (
@@ -100,6 +116,17 @@ export function Transport({ player, dur, canPlay = true, onClear, extra }: { pla
           <Btn onClick={player.reset} label="最初に戻す">⏮</Btn>
           <Segmented label="再生の速さ" value={player.speed === 1 ? 'x1' : 'x05'} options={[['x05', '×0.5'], ['x1', '×1']]} onChange={(v) => player.setSpeed(v === 'x1' ? 1 : 0.5)} />
         </>
+      )}
+      {canPlay && (
+        <div className="inline-flex gap-1">
+          <Btn onClick={back} disabled={player.t <= 0} label="0.5秒もどす">−0.5 s</Btn>
+          <Btn onClick={fwd} disabled={player.t >= dur - 1e-9} label="0.5秒進める">＋0.5 s</Btn>
+        </div>
+      )}
+      {strobe && (
+        <Toggle on={strobe.on && !strobe.disabled} onClick={() => strobe.set(!strobe.on)} disabled={strobe.disabled}>
+          足あと（1秒ごと）
+        </Toggle>
       )}
       <label className="flex min-w-40 flex-1 items-center gap-2 text-sm text-slate-700">
         <input type="range" min={0} max={dur} step={0.05} value={Math.min(player.t, dur)} onChange={(e) => player.scrub(Number(e.target.value))} aria-label="時刻" className="h-11 min-w-0 flex-1 accent-[#111827]" />

@@ -1,5 +1,6 @@
 // コース（台車が動く水平な直線）
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { groupMarks, type Mark } from '../core/strobe'
 import { ML, MR } from './GraphView'
 
 const FONT = '"BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif'
@@ -16,11 +17,15 @@ type Props = {
   onGrab?: (holding: boolean) => void
   /** 台車の上に出す文字（カウントダウンなど） */
   badge?: string | null
+  /** ストロボの足あと（null なら出さない。段の場所はいつもとっておく） */
+  marks?: Mark[] | null
 }
 
-export const TRACK_H = 84
+/** 足あとの段の場所をとっておくので、足あとを出しても消しても高さは変わらない */
+export const TRACK_H = 140
+const LANE_Y = [92, 116]
 
-export function Track({ x, v = null, lim, onDrag, onGrab, badge }: Props) {
+export function Track({ x, v = null, lim, onDrag, onGrab, badge, marks = null }: Props) {
   const wrap = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [w, setW] = useState(0)
@@ -79,6 +84,47 @@ export function Track({ x, v = null, lim, onDrag, onGrab, badge }: Props) {
     g.fillText('x〔m〕', px(lim), 4)
     g.textAlign = 'left'
     g.fillText('正の向き →', px(-lim), 4)
+
+    // ストロボの足あと：右へ進む段（上）と、左へ戻る段（下）
+    if (marks && marks.length) {
+      g.font = `bold 13px ${FONT}`
+      g.textAlign = 'left'
+      g.textBaseline = 'middle'
+      g.fillStyle = '#94a3b8'
+      g.fillText('→', 8, LANE_Y[0])
+      g.fillText('←', 8, LANE_Y[1])
+      g.strokeStyle = '#e2e8f0'
+      g.lineWidth = 1
+      for (const y of LANE_Y) {
+        g.beginPath()
+        g.moveTo(px(-lim), y)
+        g.lineTo(px(lim), y)
+        g.stroke()
+      }
+      const lastLabel = [-Infinity, -Infinity]
+      g.font = `10px ${FONT}`
+      g.textAlign = 'center'
+      for (const m of groupMarks(marks)) {
+        const mx = px(Math.min(lim, Math.max(-lim, m.x)))
+        const y = LANE_Y[m.lane]
+        g.fillStyle = '#334155'
+        g.beginPath()
+        g.arc(mx, y, m.t1 > m.t0 ? 4.5 : 3.5, 0, Math.PI * 2)
+        g.fill()
+        // 時刻の数字（となりの点と近すぎるときは省く）
+        const text = m.t1 > m.t0 ? `${m.t0}〜${m.t1}` : String(m.t0)
+        const half = g.measureText(text).width / 2
+        if (Math.abs(mx - lastLabel[m.lane]) >= half + 7) {
+          g.fillStyle = '#475569'
+          g.fillText(text, mx, y - 10)
+          lastLabel[m.lane] = mx
+        }
+      }
+      g.fillStyle = '#94a3b8'
+      g.textAlign = 'right'
+      g.textBaseline = 'alphabetic'
+      g.fillText('数字は時刻〔s〕', w - 4, TRACK_H - 4)
+    }
 
     // 台車
     const cx = px(Math.min(lim, Math.max(-lim, x)))
