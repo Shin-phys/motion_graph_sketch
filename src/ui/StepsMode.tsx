@@ -42,9 +42,15 @@ export function StepsMode({ initialStep, onHome, onMode }: Props) {
     setFinished(false)
     window.scrollTo(0, 0)
   }
+  const toInsight = () => insightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  // 予想の課題で「気づきをまとめる」を押したときだけ、気づきの欄までスクロールする（再生中には動かさない）
+  const [jump, setJump] = useState(false)
   useEffect(() => {
-    if (insight) insightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [insight])
+    if (insight && jump) {
+      toInsight()
+      setJump(false)
+    }
+  }, [insight, jump])
 
   const onPlayed = (r: Played) => {
     const checks = step.checks ?? []
@@ -121,8 +127,36 @@ export function StepsMode({ initialStep, onHome, onMode }: Props) {
                   {taskIdx + 1} / {step.tasks.length} 問目
                 </p>
               )}
-              {miss && <p className="text-sm text-vel" role="status">{miss}</p>}
+              {step.checks && (
+                <p className="flex min-h-[2.75rem] items-start gap-2 text-sm" role="status">
+                  {miss && <span className="text-vel">{miss}</span>}
+                  {!miss && insight && (
+                    <>
+                      <span className="font-bold text-emerald-800">できました！ グラフの下で、気づいたことをえらぼう。</span>
+                      <button onClick={toInsight} className="shrink-0 rounded-md border border-emerald-600 px-2 py-0.5 text-xs font-bold text-emerald-800">下へ ↓</button>
+                    </>
+                  )}
+                </p>
+              )}
             </Card>
+
+            {step.checks && <DrawLab key={`s${n}`} title={`ステップ${step.n} ${step.title}`} fixedSource="v" endNode ghostX={ghost} onPlayed={onPlayed} />}
+            {task && problem && (
+              <PredictTask
+                key={`s${n}t${taskIdx}`}
+                problem={problem}
+                task={task.task}
+                aids={step.aids}
+                onNext={() => {
+                  if (taskIdx + 1 < (step.tasks?.length ?? 0)) setTaskIdx(taskIdx + 1)
+                  else {
+                    setInsight(true)
+                    setJump(true)
+                  }
+                }}
+                nextLabel={taskIdx + 1 < (step.tasks?.length ?? 0) ? '次のグラフへ' : '気づきをまとめる'}
+              />
+            )}
 
             {insight && (
               <div ref={insightRef}>
@@ -150,21 +184,6 @@ export function StepsMode({ initialStep, onHome, onMode }: Props) {
                   </div>
                 </Card>
               </div>
-            )}
-
-            {step.checks && <DrawLab key={`s${n}`} title={`ステップ${step.n} ${step.title}`} fixedSource="v" endNode ghostX={ghost} onPlayed={onPlayed} />}
-            {task && problem && (
-              <PredictTask
-                key={`s${n}t${taskIdx}`}
-                problem={problem}
-                task={task.task}
-                aids={step.aids}
-                onNext={() => {
-                  if (taskIdx + 1 < (step.tasks?.length ?? 0)) setTaskIdx(taskIdx + 1)
-                  else setInsight(true)
-                }}
-                nextLabel={taskIdx + 1 < (step.tasks?.length ?? 0) ? '次のグラフへ' : '気づきをまとめる'}
-              />
             )}
           </>
         )}
